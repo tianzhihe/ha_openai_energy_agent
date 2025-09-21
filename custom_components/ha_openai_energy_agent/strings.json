@@ -1,0 +1,72 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "data": {
+          "name": "[%key:common::config_flow::data::name%]",
+          "api_key": "[%key:common::config_flow::data::api_key%]",
+          "base_url": "[%key:common::config_flow::data::base_url%]",
+          "api_version": "[%key:common::config_flow::data::api_version%]",
+          "organization": "[%key:common::config_flow::data::organization%]",
+          "skip_authentication": "[%key:common::config_flow::data::skip_authentication%]"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
+      "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
+      "unknown": "[%key:common::config_flow::error::unknown%]"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "prompt": "Energy Management Prompt Template",
+          "model": "AI Model for Energy Analysis",
+          "max_tokens": "Maximum response length for energy insights",
+          "temperature": "Response Creativity (0=focused, 1=creative)",
+          "top_p": "Response Diversity",
+          "max_function_calls_per_conversation": "Maximum energy function calls per conversation",
+          "functions": "Energy Management Functions",
+          "attach_username": "Include User Context for Personalized Energy Recommendations",
+          "use_tools": "Enable Advanced Energy Tools",
+          "context_threshold": "Energy Data Context Threshold",
+          "context_truncate_strategy": "Energy conversation history management"
+        }
+      }
+    }
+  },
+  "services": {
+    "query_image": {
+      "name": "Analyze Energy Image",
+      "description": "Analyze images of energy devices, solar panels, meters, or bills to provide insights",
+      "fields": {
+        "config_entry": {
+          "name": "Config Entry",
+          "description": "The config entry to use for this service"
+        },
+        "model": {
+          "name": "Model",
+          "description": "The model",
+          "example": "gpt-4-vision-preview"
+        },
+        "prompt": {
+          "name": "Energy Question",
+          "description": "Question about energy usage, solar panels, or energy bill analysis",
+          "example": "How much energy is this device consuming? What's my monthly electricity cost from this bill?"
+        },
+        "images": {
+          "name": "Energy Images",
+          "description": "Images of energy meters, solar panels, devices, or utility bills to analyze",
+          "example": "{\"url\": \"https://example.com/solar-panel-output.jpg\"}"
+        },
+        "max_tokens": {
+          "name": "Max Tokens",
+          "description": "The maximum tokens",
+          "example": "300"
+        }
+      }
+    }
+  }
+}
