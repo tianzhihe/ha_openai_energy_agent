@@ -233,6 +233,22 @@ class NativeFunctionExecutor(FunctionExecutor):
             return await self.get_user_from_user_id(
                 hass, function, arguments, user_input, exposed_entities
             )
+        if name == "get_automation":
+            return await self.get_automation(
+                hass, function, arguments, user_input, exposed_entities
+            )
+        if name == "adjust_automation":
+            return await self.adjust_automation(
+                hass, function, arguments, user_input, exposed_entities
+            )
+        if name == "create_calendar_event":
+            return await self.create_calendar_event(
+                hass, function, arguments, user_input, exposed_entities
+            )
+        if name == "get_calendar_events":
+            return await self.get_calendar_events(
+                hass, function, arguments, user_input, exposed_entities
+            )
 
         raise NativeNotFound(name)
 
@@ -330,6 +346,271 @@ class NativeFunctionExecutor(FunctionExecutor):
             {"automation_config": config, "raw_config": raw_config},
         )
         return "Success"
+
+    async def get_automation(
+        self,
+        hass: HomeAssistant,
+        function,
+        arguments,
+        user_input: conversation.ConversationInput,
+        exposed_entities,
+    ):
+        """Get automation configurations from Home Assistant."""
+        automation_id = arguments.get("automation_id")
+        
+        # Get all automation entities from the state machine
+        automations = []
+        for entity_id in hass.states.async_entity_ids("automation"):
+            state = hass.states.get(entity_id)
+            if state is None:
+                continue
+                
+            # If specific automation requested, filter by ID
+            if automation_id and entity_id != automation_id:
+                continue
+                
+            automation_info = {
+                "entity_id": entity_id,
+                "name": state.attributes.get("friendly_name", entity_id),
+                "state": state.state,
+                "enabled": state.state != "unavailable",
+                "attributes": dict(state.attributes)
+            }
+            
+            automations.append(automation_info)
+        
+        if automation_id and not automations:
+            return f"Automation '{automation_id}' not found"
+            
+        return automations if not automation_id else automations[0] if automations else None
+
+    async def adjust_automation(
+        self,
+        hass: HomeAssistant,
+        function,
+        arguments,
+        user_input: conversation.ConversationInput,
+        exposed_entities,
+    ):
+        """Modify, enable, disable, or delete existing automations."""
+        automation_id = arguments.get("automation_id")
+        action = arguments.get("action")
+        new_config = arguments.get("new_config")
+        
+        if not automation_id or not action:
+            return "automation_id and action are required"
+            
+        # Check if automation exists
+        state = hass.states.get(automation_id)
+        if state is None:
+            return f"Automation '{automation_id}' not found"
+        
+        try:
+            if action == "enable":
+                await hass.services.async_call(
+                    "automation", "turn_on", {"entity_id": automation_id}
+                )
+                return f"Automation '{automation_id}' enabled successfully"
+                
+            elif action == "disable":
+                await hass.services.async_call(
+                    "automation", "turn_off", {"entity_id": automation_id}
+                )
+                return f"Automation '{automation_id}' disabled successfully"
+                
+            elif action == "delete":
+                # For deletion, we need to remove from config file and reload
+                try:
+                    # Read current automation config
+                    config_path = os.path.join(hass.config.config_dir, AUTOMATION_CONFIG_PATH)
+                    if os.path.exists(config_path):
+                        with open(config_path, "r", encoding="utf-8") as f:
+                            current_automations = yaml.safe_load(f.read()) or []
+                        
+                        # Filter out the automation to delete (by entity_id or id)
+                        automation_simple_id = automation_id.replace("automation.", "")
+                        filtered_automations = []
+                        for auto in current_automations:
+                            if isinstance(auto, dict):
+                                auto_id = auto.get("id", auto.get("alias", ""))
+                                if auto_id != automation_simple_id:
+                                    filtered_automations.append(auto)
+                        
+                        # Write back the filtered automations
+                        with open(config_path, "w", encoding="utf-8") as f:
+                            yaml.dump(filtered_automations, f, allow_unicode=True, sort_keys=False)
+                        
+                        # Reload automations
+                        await hass.services.async_call(automation.config.DOMAIN, SERVICE_RELOAD)
+                        return f"Automation '{automation_id}' deleted successfully"
+                    else:
+                        return "Automation config file not found"
+                        
+                except Exception as e:
+                    return f"Failed to delete automation: {str(e)}"
+                    
+            elif action == "update":
+                if not new_config:
+                    return "new_config is required for update action"
+                    
+                try:
+                    # Parse the new configuration
+                    new_automation_config = yaml.safe_load(new_config)
+                    if not isinstance(new_automation_config, dict):
+                        return "Invalid automation configuration format"
+                    
+                    # Read current automations
+                    config_path = os.path.join(hass.config.config_dir, AUTOMATION_CONFIG_PATH)
+                    if os.path.exists(config_path):
+                        with open(config_path, "r", encoding="utf-8") as f:
+                            current_automations = yaml.safe_load(f.read()) or []
+                    else:
+                        current_automations = []
+                    
+                    # Find and update the automation
+                    automation_simple_id = automation_id.replace("automation.", "")
+                    updated = False
+                    
+                    for i, auto in enumerate(current_automations):
+                        if isinstance(auto, dict):
+                            auto_id = auto.get("id", auto.get("alias", ""))
+                            if auto_id == automation_simple_id:
+                                # Preserve the ID and update the rest
+                                new_automation_config["id"] = auto.get("id", automation_simple_id)
+                                current_automations[i] = new_automation_config
+                                updated = True
+                                break
+                    
+                    if not updated:
+                        return f"Automation '{automation_id}' not found in config file"
+                    
+                    # Validate the new configuration
+                    await _async_validate_config_item(hass, new_automation_config, True, False)
+                    
+                    # Write back the updated automations
+                    with open(config_path, "w", encoding="utf-8") as f:
+                        yaml.dump(current_automations, f, allow_unicode=True, sort_keys=False)
+                    
+                    # Reload automations
+                    await hass.services.async_call(automation.config.DOMAIN, SERVICE_RELOAD)
+                    return f"Automation '{automation_id}' updated successfully"
+                    
+                except Exception as e:
+                    return f"Failed to update automation: {str(e)}"
+            else:
+                return f"Invalid action '{action}'. Valid actions: enable, disable, delete, update"
+                
+        except ServiceNotFound:
+            return f"Automation service not available"
+        except Exception as e:
+            return f"Failed to {action} automation: {str(e)}"
+
+    async def create_calendar_event(
+        self,
+        hass: HomeAssistant,
+        function,
+        arguments,
+        user_input: conversation.ConversationInput,
+        exposed_entities,
+    ):
+        """Create a calendar event in Home Assistant."""
+        summary = arguments.get("summary")
+        start_date_time = arguments.get("start_date_time")
+        end_date_time = arguments.get("end_date_time")
+        
+        if not all([summary, start_date_time, end_date_time]):
+            return "summary, start_date_time, and end_date_time are required"
+        
+        try:
+            # Find available calendar entities
+            calendar_entities = [
+                entity_id for entity_id in hass.states.async_entity_ids("calendar")
+                if hass.states.get(entity_id) is not None
+            ]
+            
+            if not calendar_entities:
+                return "No calendar entities found in Home Assistant"
+            
+            # Use the first available calendar
+            calendar_entity = calendar_entities[0]
+            
+            # Create the event using calendar.create_event service
+            await hass.services.async_call(
+                "calendar",
+                "create_event",
+                {
+                    "entity_id": calendar_entity,
+                    "summary": summary,
+                    "start_date_time": start_date_time,
+                    "end_date_time": end_date_time,
+                }
+            )
+            
+            return f"Calendar event '{summary}' created successfully in {calendar_entity}"
+            
+        except ServiceNotFound:
+            return "Calendar service not available. Please ensure you have a calendar integration configured."
+        except Exception as e:
+            return f"Failed to create calendar event: {str(e)}"
+
+    async def get_calendar_events(
+        self,
+        hass: HomeAssistant,
+        function,
+        arguments,
+        user_input: conversation.ConversationInput,
+        exposed_entities,
+    ):
+        """Get calendar events from Home Assistant."""
+        start_date_time = arguments.get("start_date_time")
+        end_date_time = arguments.get("end_date_time")
+        
+        if not all([start_date_time, end_date_time]):
+            return "start_date_time and end_date_time are required"
+        
+        try:
+            # Find available calendar entities
+            calendar_entities = [
+                entity_id for entity_id in hass.states.async_entity_ids("calendar")
+                if hass.states.get(entity_id) is not None
+            ]
+            
+            if not calendar_entities:
+                return "No calendar entities found in Home Assistant"
+            
+            all_events = []
+            
+            # Get events from all calendars
+            for calendar_entity in calendar_entities:
+                try:
+                    # Use calendar.get_events service
+                    response = await hass.services.async_call(
+                        "calendar",
+                        "get_events",
+                        {
+                            "entity_id": calendar_entity,
+                            "start_date_time": start_date_time,
+                            "end_date_time": end_date_time,
+                        },
+                        return_response=True
+                    )
+                    
+                    if response and calendar_entity in response:
+                        events = response[calendar_entity].get("events", [])
+                        for event in events:
+                            event["calendar_entity"] = calendar_entity
+                            all_events.append(event)
+                            
+                except Exception as e:
+                    _LOGGER.warning(f"Failed to get events from {calendar_entity}: {e}")
+                    continue
+            
+            return all_events if all_events else "No events found in the specified time range"
+            
+        except ServiceNotFound:
+            return "Calendar service not available. Please ensure you have a calendar integration configured."
+        except Exception as e:
+            return f"Failed to get calendar events: {str(e)}"
 
     async def get_history(
         self,
