@@ -296,7 +296,7 @@ GPT5_FUNCTION_SCHEMAS = {
             "required": ["automation_id", "action"],
             "additionalProperties": False
         },
-        "strict": True
+        "strict": False
     }
 }
 
