@@ -48,8 +48,8 @@
         },
         "model": {
           "name": "Model",
-          "description": "The model",
-          "example": "gpt-4-vision-preview"
+          "description": "The AI model for energy analysis",
+          "example": "gpt-5"
         },
         "prompt": {
           "name": "Energy Question",

@@ -30,7 +30,7 @@ QUERY_IMAGE_SCHEMA = vol.Schema(
                 "integration": DOMAIN,
             }
         ),
-        vol.Required("model", default="gpt-4-vision-preview"): cv.string,
+        vol.Required("model", default="gpt-5"): cv.string,
         vol.Required("prompt"): cv.string,
         vol.Required("images"): vol.All(cv.ensure_list, [{"url": cv.string}]),
         vol.Optional("max_tokens", default=300): cv.positive_int,
@@ -60,12 +60,19 @@ async def async_setup_services(hass: HomeAssistant, config: ConfigType) -> None:
             ]
             _LOGGER.info("Prompt for %s: %s", model, messages)
 
+            # GPT-5 and newer models use max_completion_tokens instead of max_tokens
+            token_param = {}
+            if model.startswith("gpt-5") or model.startswith("o1"):
+                token_param["max_completion_tokens"] = call.data["max_tokens"]
+            else:
+                token_param["max_tokens"] = call.data["max_tokens"]
+
             response = await AsyncOpenAI(
                 api_key=hass.data[DOMAIN][call.data["config_entry"]]["api_key"]
             ).chat.completions.create(
                 model=model,
                 messages=messages,
-                max_tokens=call.data["max_tokens"],
+                **token_param,
             )
             response_dict = response.model_dump()
             _LOGGER.info("Response %s", response_dict)

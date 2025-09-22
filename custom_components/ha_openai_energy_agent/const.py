@@ -48,7 +48,7 @@ Always consider energy efficiency in my recommendations.
 Provide clear, actionable advice in everyday language.
 """
 CONF_CHAT_MODEL = "chat_model"
-DEFAULT_CHAT_MODEL = "gpt-4o-mini"
+DEFAULT_CHAT_MODEL = "gpt-5"
 CONF_MAX_TOKENS = "max_tokens"
 DEFAULT_MAX_TOKENS = 150
 CONF_TOP_P = "top_p"
