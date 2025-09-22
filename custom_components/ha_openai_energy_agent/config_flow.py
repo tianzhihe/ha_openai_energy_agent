@@ -48,6 +48,7 @@ from .const import (
     CONF_USE_CREATE_EVENT_TOOL,
     CONF_USE_GET_EVENTS_TOOL,
     CONF_USE_GET_ATTRIBUTES_TOOL,
+    CONF_ENABLE_CONTINUOUS_CONVERSATION,
     CONTEXT_TRUNCATE_STRATEGIES,
     DEFAULT_ATTACH_USERNAME,
     DEFAULT_CHAT_MODEL,
@@ -70,6 +71,7 @@ from .const import (
     DEFAULT_USE_CREATE_EVENT_TOOL,
     DEFAULT_USE_GET_EVENTS_TOOL,
     DEFAULT_USE_GET_ATTRIBUTES_TOOL,
+    DEFAULT_ENABLE_CONTINUOUS_CONVERSATION,
     DOMAIN,
 )
 from .helpers import validate_authentication
@@ -112,6 +114,7 @@ DEFAULT_OPTIONS = types.MappingProxyType(
         CONF_USE_CREATE_EVENT_TOOL: DEFAULT_USE_CREATE_EVENT_TOOL,
         CONF_USE_GET_EVENTS_TOOL: DEFAULT_USE_GET_EVENTS_TOOL,
         CONF_USE_GET_ATTRIBUTES_TOOL: DEFAULT_USE_GET_ATTRIBUTES_TOOL,
+        CONF_ENABLE_CONTINUOUS_CONVERSATION: DEFAULT_ENABLE_CONTINUOUS_CONVERSATION,
     }
 )
 
@@ -281,6 +284,11 @@ class OptionsFlow(config_entries.OptionsFlow):
                 CONF_USE_GET_ATTRIBUTES_TOOL,
                 description={"suggested_value": options.get(CONF_USE_GET_ATTRIBUTES_TOOL, DEFAULT_USE_GET_ATTRIBUTES_TOOL)},
                 default=DEFAULT_USE_GET_ATTRIBUTES_TOOL,
+            ): BooleanSelector(),
+            vol.Optional(
+                CONF_ENABLE_CONTINUOUS_CONVERSATION,
+                description={"suggested_value": options.get(CONF_ENABLE_CONTINUOUS_CONVERSATION, DEFAULT_ENABLE_CONTINUOUS_CONVERSATION)},
+                default=DEFAULT_ENABLE_CONTINUOUS_CONVERSATION,
             ): BooleanSelector(),
             vol.Optional(
                 CONF_ATTACH_USERNAME,

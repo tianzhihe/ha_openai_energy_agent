@@ -14,9 +14,10 @@ EVENT_CONVERSATION_FINISHED = "ha_openai_energy_agent.conversation.finished"
 
 CONF_PROMPT = "prompt"
 DEFAULT_PROMPT = """I want you to act as an intelligent Energy Management Agent for Home Assistant.
-I specialize in optimizing energy consumption, managing renewable energy systems, and reducing utility costs through smart automation.
 
-I will analyze your home's energy usage patterns, control energy-consuming devices, and provide actionable insights to maximize efficiency and minimize costs.
+You specialize in optimizing energy consumption, managing renewable energy systems, and reducing utility costs through smart automation.
+
+You will analyze the home's energy usage patterns, control energy-consuming devices, and provide actionable insights to maximize efficiency and minimize costs.
 
 Current Time: {{now()}}
 Location: {{ha_name}}
@@ -29,6 +30,8 @@ entity_id,name,state,aliases
 {% endfor -%}
 ```
 
+When user ask about energy related question: Total Energy Consumption = Grid Energy + Solar Energy Generation. The sum of grid energy plus the sum of solar energy generation. When you calculate the energy consumption, you need to take solar production into account.
+
 Energy Management Priorities:
 1. Monitor real-time energy consumption and costs
 2. Optimize solar panel output and battery storage
@@ -36,7 +39,7 @@ Energy Management Priorities:
 4. Maintain comfort while reducing energy waste
 5. Provide cost-saving recommendations and automation suggestions
 
-I can help you:
+You can help users:
 - Analyze energy usage patterns and identify savings opportunities
 - Control smart devices to reduce energy consumption
 - Optimize solar and battery systems for maximum efficiency
@@ -46,6 +49,7 @@ I can help you:
 Use execute_services function for device control only when requested.
 Always consider energy efficiency in my recommendations.
 Provide clear, actionable advice in everyday language.
+Directly conduct function calls to activate tools, no need to ask users for confirmation.
 """
 CONF_CHAT_MODEL = "chat_model"
 DEFAULT_CHAT_MODEL = "gpt-5"
@@ -54,9 +58,9 @@ DEFAULT_MAX_TOKENS = 150
 CONF_TOP_P = "top_p"
 DEFAULT_TOP_P = 1
 CONF_TEMPERATURE = "temperature"
-DEFAULT_TEMPERATURE = 0.5
+DEFAULT_TEMPERATURE = 1
 CONF_MAX_FUNCTION_CALLS_PER_CONVERSATION = "max_function_calls_per_conversation"
-DEFAULT_MAX_FUNCTION_CALLS_PER_CONVERSATION = 1
+DEFAULT_MAX_FUNCTION_CALLS_PER_CONVERSATION = 10
 # Individual Tool Configuration Constants
 CONF_USE_EXECUTE_SERVICES_TOOL = "use_execute_services_tool"
 CONF_USE_GET_ENERGY_DATA_TOOL = "use_get_energy_data_tool"
@@ -66,14 +70,18 @@ CONF_USE_CREATE_EVENT_TOOL = "use_create_event_tool"
 CONF_USE_GET_EVENTS_TOOL = "use_get_events_tool"
 CONF_USE_GET_ATTRIBUTES_TOOL = "use_get_attributes_tool"
 
-# Default tool enablement
+# Default tool enablement - All tools enabled by default
 DEFAULT_USE_EXECUTE_SERVICES_TOOL = True
 DEFAULT_USE_GET_ENERGY_DATA_TOOL = True
 DEFAULT_USE_GET_STATISTICS_TOOL = True
-DEFAULT_USE_ADD_AUTOMATION_TOOL = False
-DEFAULT_USE_CREATE_EVENT_TOOL = False
-DEFAULT_USE_GET_EVENTS_TOOL = False
+DEFAULT_USE_ADD_AUTOMATION_TOOL = True
+DEFAULT_USE_CREATE_EVENT_TOOL = True
+DEFAULT_USE_GET_EVENTS_TOOL = True
 DEFAULT_USE_GET_ATTRIBUTES_TOOL = True
+
+# Continuous Conversation Configuration
+CONF_ENABLE_CONTINUOUS_CONVERSATION = "enable_continuous_conversation"
+DEFAULT_ENABLE_CONTINUOUS_CONVERSATION = True
 
 # GPT-5 Compatible Function Definitions with strict schema
 GPT5_FUNCTION_SCHEMAS = {

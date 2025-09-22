@@ -58,6 +58,7 @@ from .const import (
     CONF_USE_CREATE_EVENT_TOOL,
     CONF_USE_GET_EVENTS_TOOL,
     CONF_USE_GET_ATTRIBUTES_TOOL,
+    CONF_ENABLE_CONTINUOUS_CONVERSATION,
     DEFAULT_ATTACH_USERNAME,
     DEFAULT_CHAT_MODEL,
     DEFAULT_CONF_FUNCTIONS,
@@ -77,6 +78,7 @@ from .const import (
     DEFAULT_USE_CREATE_EVENT_TOOL,
     DEFAULT_USE_GET_EVENTS_TOOL,
     DEFAULT_USE_GET_ATTRIBUTES_TOOL,
+    DEFAULT_ENABLE_CONTINUOUS_CONVERSATION,
     DOMAIN,
     EVENT_CONVERSATION_FINISHED,
     GPT5_FUNCTION_SCHEMAS,
@@ -180,11 +182,25 @@ class OpenAIAgent(conversation.AbstractConversationAgent):
     ) -> conversation.ConversationResult:
         exposed_entities = self.get_exposed_entities()
 
-        if user_input.conversation_id in self.history:
+        # Check if continuous conversation is enabled
+        enable_continuous = self.entry.options.get(
+            CONF_ENABLE_CONTINUOUS_CONVERSATION, DEFAULT_ENABLE_CONTINUOUS_CONVERSATION
+        )
+        
+        if enable_continuous and user_input.conversation_id in self.history:
             conversation_id = user_input.conversation_id
-            messages = self.history[conversation_id]
+            messages = self.history[conversation_id].copy()
+            # Update system message with current device states
+            try:
+                updated_system_message = self._generate_system_message(
+                    exposed_entities, user_input
+                )
+                messages[0] = updated_system_message  # Update the system message
+            except TemplateError as err:
+                _LOGGER.error("Error updating system message: %s", err)
         else:
-            conversation_id = ulid.ulid()
+            # Start new conversation or continuous conversation is disabled
+            conversation_id = ulid.ulid() if not enable_continuous else user_input.conversation_id or ulid.ulid()
             user_input.conversation_id = conversation_id
             try:
                 system_message = self._generate_system_message(
@@ -233,7 +249,10 @@ class OpenAIAgent(conversation.AbstractConversationAgent):
             )
 
         messages.append(query_response.message.model_dump(exclude_none=True))
-        self.history[conversation_id] = messages
+        
+        # Only store history if continuous conversation is enabled
+        if enable_continuous:
+            self.history[conversation_id] = messages
 
         self.hass.bus.async_fire(
             EVENT_CONVERSATION_FINISHED,

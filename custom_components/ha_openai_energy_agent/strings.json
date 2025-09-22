@@ -36,6 +36,7 @@
           "use_create_event_tool": "Enable Calendar Event Creation",
           "use_get_events_tool": "Enable Calendar Event Retrieval",
           "use_get_attributes_tool": "Enable Entity Attribute Access",
+          "enable_continuous_conversation": "Enable Continuous Conversation Memory",
           "attach_username": "Include User Context for Personalized Energy Recommendations",
           "use_tools": "Enable Advanced Energy Tools (Legacy)",
           "context_threshold": "Energy Data Context Threshold",
