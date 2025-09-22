@@ -117,7 +117,7 @@ GPT5_FUNCTION_SCHEMAS = {
             "required": ["list"],
             "additionalProperties": False
         },
-        "strict": True
+        "strict": False
     },
     "get_energy_statistic_ids": {
         "type": "function",
@@ -125,12 +125,8 @@ GPT5_FUNCTION_SCHEMAS = {
         "description": "Get energy statistic IDs for analysis and monitoring",
         "parameters": {
             "type": "object",
-            "properties": {
-                "dummy": {
-                    "type": "string",
-                    "description": "Placeholder parameter"
-                }
-            },
+            "properties": {},
+            "required": [],
             "additionalProperties": False
         },
         "strict": True
@@ -216,7 +212,7 @@ GPT5_FUNCTION_SCHEMAS = {
             "required": ["summary"],
             "additionalProperties": False
         },
-        "strict": True
+        "strict": False
     },
     "get_events": {
         "type": "function",
