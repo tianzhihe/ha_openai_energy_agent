@@ -57,49 +57,210 @@ CONF_TEMPERATURE = "temperature"
 DEFAULT_TEMPERATURE = 0.5
 CONF_MAX_FUNCTION_CALLS_PER_CONVERSATION = "max_function_calls_per_conversation"
 DEFAULT_MAX_FUNCTION_CALLS_PER_CONVERSATION = 1
-CONF_FUNCTIONS = "functions"
-DEFAULT_CONF_FUNCTIONS = [
-    {
-        "spec": {
-            "name": "execute_services",
-            "description": "Execute energy management services for smart devices, HVAC systems, solar panels, and battery storage. Focus on energy efficiency and cost optimization.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "list": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "domain": {
-                                    "type": "string",
-                                    "description": "The domain of the energy-related service (e.g., switch, climate, sensor, solar, battery)",
-                                },
-                                "service": {
-                                    "type": "string",
-                                    "description": "The energy management service to be called (e.g., turn_on, turn_off, set_temperature, optimize)",
-                                },
-                                "service_data": {
-                                    "type": "object",
-                                    "description": "Service data for energy device control and optimization.",
-                                    "properties": {
-                                        "entity_id": {
-                                            "type": "string",
-                                            "description": "The entity_id of the energy device. Must start with domain, followed by dot character.",
-                                        }
-                                    },
-                                    "required": ["entity_id"],
-                                },
+# Individual Tool Configuration Constants
+CONF_USE_EXECUTE_SERVICES_TOOL = "use_execute_services_tool"
+CONF_USE_GET_ENERGY_DATA_TOOL = "use_get_energy_data_tool"
+CONF_USE_GET_STATISTICS_TOOL = "use_get_statistics_tool"
+CONF_USE_ADD_AUTOMATION_TOOL = "use_add_automation_tool"
+CONF_USE_CREATE_EVENT_TOOL = "use_create_event_tool"
+CONF_USE_GET_EVENTS_TOOL = "use_get_events_tool"
+CONF_USE_GET_ATTRIBUTES_TOOL = "use_get_attributes_tool"
+
+# Default tool enablement
+DEFAULT_USE_EXECUTE_SERVICES_TOOL = True
+DEFAULT_USE_GET_ENERGY_DATA_TOOL = True
+DEFAULT_USE_GET_STATISTICS_TOOL = True
+DEFAULT_USE_ADD_AUTOMATION_TOOL = False
+DEFAULT_USE_CREATE_EVENT_TOOL = False
+DEFAULT_USE_GET_EVENTS_TOOL = False
+DEFAULT_USE_GET_ATTRIBUTES_TOOL = True
+
+# GPT-5 Compatible Function Definitions with strict schema
+GPT5_FUNCTION_SCHEMAS = {
+    "execute_services": {
+        "type": "function",
+        "name": "execute_services",
+        "description": "Execute energy management services for smart devices, HVAC systems, solar panels, and battery storage. Focus on energy efficiency and cost optimization.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "list": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "domain": {
+                                "type": "string",
+                                "description": "The domain of the energy-related service"
                             },
-                            "required": ["domain", "service", "service_data"],
+                            "service": {
+                                "type": "string",
+                                "description": "The energy management service to be called"
+                            },
+                            "service_data": {
+                                "type": "object",
+                                "properties": {
+                                    "entity_id": {
+                                        "type": "string",
+                                        "description": "The entity_id of the energy device. Must start with domain, followed by dot character."
+                                    }
+                                },
+                                "required": ["entity_id"],
+                                "additionalProperties": False
+                            }
                         },
+                        "required": ["domain", "service", "service_data"],
+                        "additionalProperties": False
+                    }
+                }
+            },
+            "required": ["list"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+    "get_energy_statistic_ids": {
+        "type": "function",
+        "name": "get_energy_statistic_ids",
+        "description": "Get energy statistic IDs for analysis and monitoring",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "dummy": {
+                    "type": "string",
+                    "description": "Placeholder parameter"
+                }
+            },
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+    "get_statistics": {
+        "type": "function",
+        "name": "get_statistics",
+        "description": "Get energy statistics for specified time periods and devices",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "start_time": {
+                    "type": "string",
+                    "description": "The start datetime"
+                },
+                "end_time": {
+                    "type": "string",
+                    "description": "The end datetime"
+                },
+                "statistic_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "description": "The statistic IDs"
                     }
                 },
+                "period": {
+                    "type": "string",
+                    "description": "The period",
+                    "enum": ["day", "week", "month"]
+                }
             },
+            "required": ["start_time", "end_time", "statistic_ids", "period"],
+            "additionalProperties": False
         },
-        "function": {"type": "native", "name": "execute_service"},
+        "strict": True
+    },
+    "add_automation": {
+        "type": "function",
+        "name": "add_automation",
+        "description": "Add energy-saving automation to Home Assistant",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "automation_config": {
+                    "type": "string",
+                    "description": "A configuration for automation in valid YAML format. Use \\n for line breaks."
+                }
+            },
+            "required": ["automation_config"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+    "create_event": {
+        "type": "function",
+        "name": "create_event",
+        "description": "Create calendar events for energy management scheduling",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "summary": {
+                    "type": "string",
+                    "description": "Event summary or subject"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Detailed event description"
+                },
+                "start_date_time": {
+                    "type": "string",
+                    "description": "Event start date and time"
+                },
+                "end_date_time": {
+                    "type": "string",
+                    "description": "Event end date and time"
+                },
+                "location": {
+                    "type": "string",
+                    "description": "Event location"
+                }
+            },
+            "required": ["summary"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+    "get_events": {
+        "type": "function",
+        "name": "get_events",
+        "description": "Get calendar events for energy management scheduling",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "start_date_time": {
+                    "type": "string",
+                    "description": "Start date time in '%Y-%m-%dT%H:%M:%S%z' format"
+                },
+                "end_date_time": {
+                    "type": "string",
+                    "description": "End date time in '%Y-%m-%dT%H:%M:%S%z' format"
+                }
+            },
+            "required": ["start_date_time", "end_date_time"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+    "get_attributes": {
+        "type": "function",
+        "name": "get_attributes",
+        "description": "Get detailed attributes of Home Assistant energy entities",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "entity_id": {
+                    "type": "string",
+                    "description": "The entity ID to get attributes for"
+                }
+            },
+            "required": ["entity_id"],
+            "additionalProperties": False
+        },
+        "strict": True
     }
-]
+}
+
+# Legacy support - will be deprecated
+CONF_FUNCTIONS = "functions"
+DEFAULT_CONF_FUNCTIONS = []
 CONF_ATTACH_USERNAME = "attach_username"
 DEFAULT_ATTACH_USERNAME = False
 CONF_USE_TOOLS = "use_tools"

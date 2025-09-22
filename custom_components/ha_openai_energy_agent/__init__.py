@@ -51,6 +51,13 @@ from .const import (
     CONF_TEMPERATURE,
     CONF_TOP_P,
     CONF_USE_TOOLS,
+    CONF_USE_EXECUTE_SERVICES_TOOL,
+    CONF_USE_GET_ENERGY_DATA_TOOL,
+    CONF_USE_GET_STATISTICS_TOOL,
+    CONF_USE_ADD_AUTOMATION_TOOL,
+    CONF_USE_CREATE_EVENT_TOOL,
+    CONF_USE_GET_EVENTS_TOOL,
+    CONF_USE_GET_ATTRIBUTES_TOOL,
     DEFAULT_ATTACH_USERNAME,
     DEFAULT_CHAT_MODEL,
     DEFAULT_CONF_FUNCTIONS,
@@ -63,8 +70,16 @@ from .const import (
     DEFAULT_TEMPERATURE,
     DEFAULT_TOP_P,
     DEFAULT_USE_TOOLS,
+    DEFAULT_USE_EXECUTE_SERVICES_TOOL,
+    DEFAULT_USE_GET_ENERGY_DATA_TOOL,
+    DEFAULT_USE_GET_STATISTICS_TOOL,
+    DEFAULT_USE_ADD_AUTOMATION_TOOL,
+    DEFAULT_USE_CREATE_EVENT_TOOL,
+    DEFAULT_USE_GET_EVENTS_TOOL,
+    DEFAULT_USE_GET_ATTRIBUTES_TOOL,
     DOMAIN,
     EVENT_CONVERSATION_FINISHED,
+    GPT5_FUNCTION_SCHEMAS,
 )
 from .exceptions import (
     FunctionLoadFailed,
@@ -285,22 +300,71 @@ class OpenAIAgent(conversation.AbstractConversationAgent):
         return exposed_entities
 
     def get_functions(self):
-        try:
-            function = self.entry.options.get(CONF_FUNCTIONS)
-            result = yaml.safe_load(function) if function else DEFAULT_CONF_FUNCTIONS
-            if result:
-                for setting in result:
-                    function_executor = get_function_executor(
-                        setting["function"]["type"]
-                    )
-                    setting["function"] = function_executor.to_arguments(
-                        setting["function"]
-                    )
-            return result
-        except (InvalidFunction, FunctionNotFound) as e:
-            raise e
-        except:
-            raise FunctionLoadFailed()
+        """Get enabled functions based on individual tool toggles."""
+        enabled_functions = []
+        
+        # Map of tool configs to function schemas and executors
+        tool_mapping = {
+            CONF_USE_EXECUTE_SERVICES_TOOL: {
+                "schema": GPT5_FUNCTION_SCHEMAS["execute_services"],
+                "executor": {"type": "native", "name": "execute_service"}
+            },
+            CONF_USE_GET_ENERGY_DATA_TOOL: {
+                "schema": GPT5_FUNCTION_SCHEMAS["get_energy_statistic_ids"],
+                "executor": {"type": "native", "name": "get_energy"}
+            },
+            CONF_USE_GET_STATISTICS_TOOL: {
+                "schema": GPT5_FUNCTION_SCHEMAS["get_statistics"],
+                "executor": {"type": "native", "name": "get_statistics"}
+            },
+            CONF_USE_ADD_AUTOMATION_TOOL: {
+                "schema": GPT5_FUNCTION_SCHEMAS["add_automation"],
+                "executor": {"type": "native", "name": "add_automation"}
+            },
+            CONF_USE_CREATE_EVENT_TOOL: {
+                "schema": GPT5_FUNCTION_SCHEMAS["create_event"],
+                "executor": {"type": "script", "sequence": [{"service": "calendar.create_event"}]}
+            },
+            CONF_USE_GET_EVENTS_TOOL: {
+                "schema": GPT5_FUNCTION_SCHEMAS["get_events"],
+                "executor": {"type": "script", "sequence": [{"service": "calendar.get_events"}]}
+            },
+            CONF_USE_GET_ATTRIBUTES_TOOL: {
+                "schema": GPT5_FUNCTION_SCHEMAS["get_attributes"],
+                "executor": {"type": "template", "value_template": "{{ states[entity_id] }}"}
+            }
+        }
+        
+        # Check each tool toggle and add enabled functions
+        for tool_conf, tool_data in tool_mapping.items():
+            # Get the default value for each tool
+            default_value = {
+                CONF_USE_EXECUTE_SERVICES_TOOL: DEFAULT_USE_EXECUTE_SERVICES_TOOL,
+                CONF_USE_GET_ENERGY_DATA_TOOL: DEFAULT_USE_GET_ENERGY_DATA_TOOL,
+                CONF_USE_GET_STATISTICS_TOOL: DEFAULT_USE_GET_STATISTICS_TOOL,
+                CONF_USE_ADD_AUTOMATION_TOOL: DEFAULT_USE_ADD_AUTOMATION_TOOL,
+                CONF_USE_CREATE_EVENT_TOOL: DEFAULT_USE_CREATE_EVENT_TOOL,
+                CONF_USE_GET_EVENTS_TOOL: DEFAULT_USE_GET_EVENTS_TOOL,
+                CONF_USE_GET_ATTRIBUTES_TOOL: DEFAULT_USE_GET_ATTRIBUTES_TOOL,
+            }.get(tool_conf, False)
+            
+            if self.entry.options.get(tool_conf, default_value):
+                try:
+                    function_executor = get_function_executor(tool_data["executor"]["type"])
+                    processed_executor = function_executor.to_arguments(tool_data["executor"])
+                    
+                    enabled_functions.append({
+                        "spec": tool_data["schema"],
+                        "function": processed_executor
+                    })
+                except (InvalidFunction, FunctionNotFound) as e:
+                    _LOGGER.warning("Failed to load function %s: %s", tool_data["schema"]["name"], e)
+                    continue
+                except Exception as e:
+                    _LOGGER.warning("Unexpected error loading function %s: %s", tool_data["schema"]["name"], e)
+                    continue
+        
+        return enabled_functions
 
     async def truncate_message_history(
         self, messages, exposed_entities, user_input: conversation.ConversationInput
@@ -331,16 +395,89 @@ class OpenAIAgent(conversation.AbstractConversationAgent):
         exposed_entities,
         n_requests,
     ) -> OpenAIQueryResponse:
-        """Process a sentence."""
+        """Process a sentence using appropriate API for model version."""
         model = self.entry.options.get(CONF_CHAT_MODEL, DEFAULT_CHAT_MODEL)
         max_tokens = self.entry.options.get(CONF_MAX_TOKENS, DEFAULT_MAX_TOKENS)
         top_p = self.entry.options.get(CONF_TOP_P, DEFAULT_TOP_P)
         temperature = self.entry.options.get(CONF_TEMPERATURE, DEFAULT_TEMPERATURE)
-        use_tools = self.entry.options.get(CONF_USE_TOOLS, DEFAULT_USE_TOOLS)
         context_threshold = self.entry.options.get(
             CONF_CONTEXT_THRESHOLD, DEFAULT_CONTEXT_THRESHOLD
         )
         functions = list(map(lambda s: s["spec"], self.get_functions()))
+        
+        _LOGGER.info("Prompt for %s: %s", model, json.dumps(messages))
+
+        # Check if this is GPT-5 or newer model
+        if model.startswith("gpt-5") or model.startswith("o1"):
+            return await self._query_gpt5(
+                user_input, messages, exposed_entities, n_requests, model, max_tokens, 
+                top_p, temperature, context_threshold, functions
+            )
+        else:
+            return await self._query_legacy(
+                user_input, messages, exposed_entities, n_requests, model, max_tokens,
+                top_p, temperature, context_threshold, functions
+            )
+
+    async def _query_gpt5(
+        self, user_input, messages, exposed_entities, n_requests, model, max_tokens,
+        top_p, temperature, context_threshold, functions
+    ) -> OpenAIQueryResponse:
+        """Handle GPT-5 API calls using responses.create()."""
+        try:
+            # Convert messages format for GPT-5 input
+            input_messages = [{"role": msg["role"], "content": msg["content"]} for msg in messages]
+            
+            # Prepare tools for GPT-5
+            tools = functions if functions else []
+            
+            # GPT-5 uses responses.create() API
+            response = await self.client.responses.create(
+                model=model,
+                input=input_messages,
+                tools=tools,
+                max_completion_tokens=max_tokens,
+            )
+            
+            _LOGGER.info("GPT-5 Response: %s", json.dumps(response.model_dump(exclude_none=True)))
+            
+            # Process GPT-5 response format
+            if response.output and len(response.output) > 0:
+                output = response.output[0]
+                
+                # Check if there are tool calls
+                if hasattr(output, 'tool_calls') and output.tool_calls:
+                    # Handle function calls
+                    return await self._execute_gpt5_tool_calls(
+                        user_input, messages, output, exposed_entities, n_requests + 1
+                    )
+                else:
+                    # Regular text response
+                    message = ChatCompletionMessage(
+                        role="assistant",
+                        content=output.content if hasattr(output, 'content') else str(output)
+                    )
+                    # Create a mock response object for compatibility
+                    mock_response = type('MockResponse', (), {
+                        'usage': type('Usage', (), {'total_tokens': 0})(),
+                        'choices': [type('Choice', (), {'message': message})()]
+                    })()
+                    return OpenAIQueryResponse(response=mock_response, message=message)
+            
+        except Exception as e:
+            _LOGGER.error("GPT-5 API call failed: %s", e)
+            # Fallback to legacy API
+            return await self._query_legacy(
+                user_input, messages, exposed_entities, n_requests, model, max_tokens,
+                top_p, temperature, context_threshold, functions
+            )
+
+    async def _query_legacy(
+        self, user_input, messages, exposed_entities, n_requests, model, max_tokens,
+        top_p, temperature, context_threshold, functions
+    ) -> OpenAIQueryResponse:
+        """Handle legacy API calls using chat.completions.create()."""
+        use_tools = self.entry.options.get(CONF_USE_TOOLS, DEFAULT_USE_TOOLS)
         function_call = "auto"
         if n_requests == self.entry.options.get(
             CONF_MAX_FUNCTION_CALLS_PER_CONVERSATION,
@@ -358,14 +495,8 @@ class OpenAIAgent(conversation.AbstractConversationAgent):
         if len(functions) == 0:
             tool_kwargs = {}
 
-        _LOGGER.info("Prompt for %s: %s", model, json.dumps(messages))
-
-        # GPT-5 and newer models use max_completion_tokens instead of max_tokens
-        token_param = {}
-        if model.startswith("gpt-5") or model.startswith("o1"):
-            token_param["max_completion_tokens"] = max_tokens
-        else:
-            token_param["max_tokens"] = max_tokens
+        # Legacy models use max_tokens
+        token_param = {"max_tokens": max_tokens}
 
         response: ChatCompletion = await self.client.chat.completions.create(
             model=model,
@@ -377,7 +508,7 @@ class OpenAIAgent(conversation.AbstractConversationAgent):
             **tool_kwargs,
         )
 
-        _LOGGER.info("Response %s", json.dumps(response.model_dump(exclude_none=True)))
+        _LOGGER.info("Legacy Response: %s", json.dumps(response.model_dump(exclude_none=True)))
 
         if response.usage.total_tokens > context_threshold:
             await self.truncate_message_history(messages, exposed_entities, user_input)
@@ -397,6 +528,62 @@ class OpenAIAgent(conversation.AbstractConversationAgent):
             raise TokenLengthExceededError(response.usage.completion_tokens)
 
         return OpenAIQueryResponse(response=response, message=message)
+
+    async def _execute_gpt5_tool_calls(
+        self, user_input, messages, output, exposed_entities, n_requests
+    ) -> OpenAIQueryResponse:
+        """Execute GPT-5 tool calls."""
+        try:
+            # Add the assistant's message with tool calls to history
+            messages.append({
+                "role": "assistant", 
+                "content": output.content if hasattr(output, 'content') else "",
+                "tool_calls": [tool_call.model_dump() for tool_call in output.tool_calls]
+            })
+            
+            # Execute each tool call
+            for tool_call in output.tool_calls:
+                function_name = tool_call.function.name if hasattr(tool_call, 'function') else tool_call.name
+                function = next(
+                    (s for s in self.get_functions() if s["spec"]["name"] == function_name),
+                    None,
+                )
+                
+                if function is not None:
+                    result = await self.execute_tool_function(
+                        user_input, tool_call, exposed_entities, function
+                    )
+                    
+                    messages.append({
+                        "tool_call_id": tool_call.id if hasattr(tool_call, 'id') else str(hash(function_name)),
+                        "role": "tool",
+                        "name": function_name,
+                        "content": str(result),
+                    })
+                else:
+                    _LOGGER.error("Function not found: %s", function_name)
+                    messages.append({
+                        "tool_call_id": tool_call.id if hasattr(tool_call, 'id') else str(hash(function_name)),
+                        "role": "tool", 
+                        "name": function_name,
+                        "content": f"Error: Function {function_name} not found",
+                    })
+            
+            # Continue conversation with updated messages
+            return await self.query(user_input, messages, exposed_entities, n_requests)
+            
+        except Exception as e:
+            _LOGGER.error("Error executing GPT-5 tool calls: %s", e)
+            # Return a basic response
+            message = ChatCompletionMessage(
+                role="assistant",
+                content=f"I encountered an error while processing your request: {e}"
+            )
+            mock_response = type('MockResponse', (), {
+                'usage': type('Usage', (), {'total_tokens': 0})(),
+                'choices': [type('Choice', (), {'message': message})()]
+            })()
+            return OpenAIQueryResponse(response=mock_response, message=message)
 
     async def execute_function_call(
         self,

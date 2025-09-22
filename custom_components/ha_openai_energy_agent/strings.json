@@ -28,9 +28,16 @@
           "temperature": "Response Creativity (0=focused, 1=creative)",
           "top_p": "Response Diversity",
           "max_function_calls_per_conversation": "Maximum energy function calls per conversation",
-          "functions": "Energy Management Functions",
+          "functions": "Energy Management Functions (Legacy)",
+          "use_execute_services_tool": "Enable Device Control & Services",
+          "use_get_energy_data_tool": "Enable Energy Statistics Retrieval",
+          "use_get_statistics_tool": "Enable Historical Data Analysis",
+          "use_add_automation_tool": "Enable Automation Creation",
+          "use_create_event_tool": "Enable Calendar Event Creation",
+          "use_get_events_tool": "Enable Calendar Event Retrieval",
+          "use_get_attributes_tool": "Enable Entity Attribute Access",
           "attach_username": "Include User Context for Personalized Energy Recommendations",
-          "use_tools": "Enable Advanced Energy Tools",
+          "use_tools": "Enable Advanced Energy Tools (Legacy)",
           "context_threshold": "Energy Data Context Threshold",
           "context_truncate_strategy": "Energy conversation history management"
         }

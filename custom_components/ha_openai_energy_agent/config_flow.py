@@ -41,6 +41,13 @@ from .const import (
     CONF_TEMPERATURE,
     CONF_TOP_P,
     CONF_USE_TOOLS,
+    CONF_USE_EXECUTE_SERVICES_TOOL,
+    CONF_USE_GET_ENERGY_DATA_TOOL,
+    CONF_USE_GET_STATISTICS_TOOL,
+    CONF_USE_ADD_AUTOMATION_TOOL,
+    CONF_USE_CREATE_EVENT_TOOL,
+    CONF_USE_GET_EVENTS_TOOL,
+    CONF_USE_GET_ATTRIBUTES_TOOL,
     CONTEXT_TRUNCATE_STRATEGIES,
     DEFAULT_ATTACH_USERNAME,
     DEFAULT_CHAT_MODEL,
@@ -56,6 +63,13 @@ from .const import (
     DEFAULT_TEMPERATURE,
     DEFAULT_TOP_P,
     DEFAULT_USE_TOOLS,
+    DEFAULT_USE_EXECUTE_SERVICES_TOOL,
+    DEFAULT_USE_GET_ENERGY_DATA_TOOL,
+    DEFAULT_USE_GET_STATISTICS_TOOL,
+    DEFAULT_USE_ADD_AUTOMATION_TOOL,
+    DEFAULT_USE_CREATE_EVENT_TOOL,
+    DEFAULT_USE_GET_EVENTS_TOOL,
+    DEFAULT_USE_GET_ATTRIBUTES_TOOL,
     DOMAIN,
 )
 from .helpers import validate_authentication
@@ -90,6 +104,14 @@ DEFAULT_OPTIONS = types.MappingProxyType(
         CONF_USE_TOOLS: DEFAULT_USE_TOOLS,
         CONF_CONTEXT_THRESHOLD: DEFAULT_CONTEXT_THRESHOLD,
         CONF_CONTEXT_TRUNCATE_STRATEGY: DEFAULT_CONTEXT_TRUNCATE_STRATEGY,
+        # Individual Tool Options
+        CONF_USE_EXECUTE_SERVICES_TOOL: DEFAULT_USE_EXECUTE_SERVICES_TOOL,
+        CONF_USE_GET_ENERGY_DATA_TOOL: DEFAULT_USE_GET_ENERGY_DATA_TOOL,
+        CONF_USE_GET_STATISTICS_TOOL: DEFAULT_USE_GET_STATISTICS_TOOL,
+        CONF_USE_ADD_AUTOMATION_TOOL: DEFAULT_USE_ADD_AUTOMATION_TOOL,
+        CONF_USE_CREATE_EVENT_TOOL: DEFAULT_USE_CREATE_EVENT_TOOL,
+        CONF_USE_GET_EVENTS_TOOL: DEFAULT_USE_GET_EVENTS_TOOL,
+        CONF_USE_GET_ATTRIBUTES_TOOL: DEFAULT_USE_GET_ATTRIBUTES_TOOL,
     }
 )
 
@@ -224,11 +246,42 @@ class OptionsFlow(config_entries.OptionsFlow):
                 },
                 default=DEFAULT_MAX_FUNCTION_CALLS_PER_CONVERSATION,
             ): int,
+            # Individual Energy Management Tools
             vol.Optional(
-                CONF_FUNCTIONS,
-                description={"suggested_value": options.get(CONF_FUNCTIONS)},
-                default=DEFAULT_CONF_FUNCTIONS_STR,
-            ): TemplateSelector(),
+                CONF_USE_EXECUTE_SERVICES_TOOL,
+                description={"suggested_value": options.get(CONF_USE_EXECUTE_SERVICES_TOOL, DEFAULT_USE_EXECUTE_SERVICES_TOOL)},
+                default=DEFAULT_USE_EXECUTE_SERVICES_TOOL,
+            ): BooleanSelector(),
+            vol.Optional(
+                CONF_USE_GET_ENERGY_DATA_TOOL,
+                description={"suggested_value": options.get(CONF_USE_GET_ENERGY_DATA_TOOL, DEFAULT_USE_GET_ENERGY_DATA_TOOL)},
+                default=DEFAULT_USE_GET_ENERGY_DATA_TOOL,
+            ): BooleanSelector(),
+            vol.Optional(
+                CONF_USE_GET_STATISTICS_TOOL,
+                description={"suggested_value": options.get(CONF_USE_GET_STATISTICS_TOOL, DEFAULT_USE_GET_STATISTICS_TOOL)},
+                default=DEFAULT_USE_GET_STATISTICS_TOOL,
+            ): BooleanSelector(),
+            vol.Optional(
+                CONF_USE_ADD_AUTOMATION_TOOL,
+                description={"suggested_value": options.get(CONF_USE_ADD_AUTOMATION_TOOL, DEFAULT_USE_ADD_AUTOMATION_TOOL)},
+                default=DEFAULT_USE_ADD_AUTOMATION_TOOL,
+            ): BooleanSelector(),
+            vol.Optional(
+                CONF_USE_CREATE_EVENT_TOOL,
+                description={"suggested_value": options.get(CONF_USE_CREATE_EVENT_TOOL, DEFAULT_USE_CREATE_EVENT_TOOL)},
+                default=DEFAULT_USE_CREATE_EVENT_TOOL,
+            ): BooleanSelector(),
+            vol.Optional(
+                CONF_USE_GET_EVENTS_TOOL,
+                description={"suggested_value": options.get(CONF_USE_GET_EVENTS_TOOL, DEFAULT_USE_GET_EVENTS_TOOL)},
+                default=DEFAULT_USE_GET_EVENTS_TOOL,
+            ): BooleanSelector(),
+            vol.Optional(
+                CONF_USE_GET_ATTRIBUTES_TOOL,
+                description={"suggested_value": options.get(CONF_USE_GET_ATTRIBUTES_TOOL, DEFAULT_USE_GET_ATTRIBUTES_TOOL)},
+                default=DEFAULT_USE_GET_ATTRIBUTES_TOOL,
+            ): BooleanSelector(),
             vol.Optional(
                 CONF_ATTACH_USERNAME,
                 description={"suggested_value": options.get(CONF_ATTACH_USERNAME)},
