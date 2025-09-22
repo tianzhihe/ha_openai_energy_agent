@@ -204,10 +204,6 @@ GPT5_FUNCTION_SCHEMAS = {
                     "type": "string",
                     "description": "Event summary or subject"
                 },
-                "description": {
-                    "type": "string",
-                    "description": "Detailed event description"
-                },
                 "start_date_time": {
                     "type": "string",
                     "description": "Event start date and time in ISO format (YYYY-MM-DDTHH:MM:SS)"
