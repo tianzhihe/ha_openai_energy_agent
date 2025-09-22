@@ -424,7 +424,6 @@ class OpenAIAgent(conversation.AbstractConversationAgent):
         top_p, temperature, context_threshold, functions
     ) -> OpenAIQueryResponse:
         """Handle GPT-5 API calls using chat.completions.create() with max_completion_tokens."""
-        use_tools = self.entry.options.get(CONF_USE_TOOLS, DEFAULT_USE_TOOLS)
         function_call = "auto"
         if n_requests == self.entry.options.get(
             CONF_MAX_FUNCTION_CALLS_PER_CONVERSATION,
@@ -432,15 +431,14 @@ class OpenAIAgent(conversation.AbstractConversationAgent):
         ):
             function_call = "none"
 
-        tool_kwargs = {"functions": functions, "function_call": function_call}
-        if use_tools:
+        # GPT-5 requires tools format (not functions format) to support strict parameter
+        if len(functions) == 0:
+            tool_kwargs = {}
+        else:
             tool_kwargs = {
                 "tools": [{"type": "function", "function": func} for func in functions],
                 "tool_choice": function_call,
             }
-
-        if len(functions) == 0:
-            tool_kwargs = {}
 
         # GPT-5 uses max_completion_tokens instead of max_tokens
         response: ChatCompletion = await self.client.chat.completions.create(
