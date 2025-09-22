@@ -60,7 +60,7 @@ async def async_setup_services(hass: HomeAssistant, config: ConfigType) -> None:
             ]
             _LOGGER.info("Prompt for %s: %s", model, messages)
 
-            # GPT-5 and newer models use max_completion_tokens instead of max_tokens
+            # GPT-5 and o1 models use max_completion_tokens instead of max_tokens
             token_param = {}
             if model.startswith("gpt-5") or model.startswith("o1"):
                 token_param["max_completion_tokens"] = call.data["max_tokens"]

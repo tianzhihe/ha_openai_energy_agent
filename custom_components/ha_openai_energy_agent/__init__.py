@@ -407,7 +407,7 @@ class OpenAIAgent(conversation.AbstractConversationAgent):
         
         _LOGGER.info("Prompt for %s: %s", model, json.dumps(messages))
 
-        # Check if this is GPT-5 or newer model
+        # Check if this is GPT-5 or o1 model that requires max_completion_tokens
         if model.startswith("gpt-5") or model.startswith("o1"):
             return await self._query_gpt5(
                 user_input, messages, exposed_entities, n_requests, model, max_tokens, 
@@ -423,54 +423,56 @@ class OpenAIAgent(conversation.AbstractConversationAgent):
         self, user_input, messages, exposed_entities, n_requests, model, max_tokens,
         top_p, temperature, context_threshold, functions
     ) -> OpenAIQueryResponse:
-        """Handle GPT-5 API calls using responses.create()."""
-        try:
-            # Convert messages format for GPT-5 input
-            input_messages = [{"role": msg["role"], "content": msg["content"]} for msg in messages]
-            
-            # Prepare tools for GPT-5
-            tools = functions if functions else []
-            
-            # GPT-5 uses responses.create() API
-            response = await self.client.responses.create(
-                model=model,
-                input=input_messages,
-                tools=tools,
-                max_completion_tokens=max_tokens,
+        """Handle GPT-5 API calls using chat.completions.create() with max_completion_tokens."""
+        use_tools = self.entry.options.get(CONF_USE_TOOLS, DEFAULT_USE_TOOLS)
+        function_call = "auto"
+        if n_requests == self.entry.options.get(
+            CONF_MAX_FUNCTION_CALLS_PER_CONVERSATION,
+            DEFAULT_MAX_FUNCTION_CALLS_PER_CONVERSATION,
+        ):
+            function_call = "none"
+
+        tool_kwargs = {"functions": functions, "function_call": function_call}
+        if use_tools:
+            tool_kwargs = {
+                "tools": [{"type": "function", "function": func} for func in functions],
+                "tool_choice": function_call,
+            }
+
+        if len(functions) == 0:
+            tool_kwargs = {}
+
+        # GPT-5 uses max_completion_tokens instead of max_tokens
+        response: ChatCompletion = await self.client.chat.completions.create(
+            model=model,
+            messages=messages,
+            max_completion_tokens=max_tokens,
+            top_p=top_p,
+            temperature=temperature,
+            user=user_input.conversation_id,
+            **tool_kwargs,
+        )
+
+        _LOGGER.info("GPT-5 Response: %s", json.dumps(response.model_dump(exclude_none=True)))
+
+        if response.usage.total_tokens > context_threshold:
+            await self.truncate_message_history(messages, exposed_entities, user_input)
+
+        choice: Choice = response.choices[0]
+        message = choice.message
+
+        if choice.finish_reason == "function_call":
+            return await self.execute_function_call(
+                user_input, messages, message, exposed_entities, n_requests + 1
             )
-            
-            _LOGGER.info("GPT-5 Response: %s", json.dumps(response.model_dump(exclude_none=True)))
-            
-            # Process GPT-5 response format
-            if response.output and len(response.output) > 0:
-                output = response.output[0]
-                
-                # Check if there are tool calls
-                if hasattr(output, 'tool_calls') and output.tool_calls:
-                    # Handle function calls
-                    return await self._execute_gpt5_tool_calls(
-                        user_input, messages, output, exposed_entities, n_requests + 1
-                    )
-                else:
-                    # Regular text response
-                    message = ChatCompletionMessage(
-                        role="assistant",
-                        content=output.content if hasattr(output, 'content') else str(output)
-                    )
-                    # Create a mock response object for compatibility
-                    mock_response = type('MockResponse', (), {
-                        'usage': type('Usage', (), {'total_tokens': 0})(),
-                        'choices': [type('Choice', (), {'message': message})()]
-                    })()
-                    return OpenAIQueryResponse(response=mock_response, message=message)
-            
-        except Exception as e:
-            _LOGGER.error("GPT-5 API call failed: %s", e)
-            # Fallback to legacy API
-            return await self._query_legacy(
-                user_input, messages, exposed_entities, n_requests, model, max_tokens,
-                top_p, temperature, context_threshold, functions
+        if choice.finish_reason == "tool_calls":
+            return await self.execute_tool_calls(
+                user_input, messages, message, exposed_entities, n_requests + 1
             )
+        if choice.finish_reason == "length":
+            raise TokenLengthExceededError(response.usage.completion_tokens)
+
+        return OpenAIQueryResponse(response=response, message=message)
 
     async def _query_legacy(
         self, user_input, messages, exposed_entities, n_requests, model, max_tokens,
@@ -529,61 +531,6 @@ class OpenAIAgent(conversation.AbstractConversationAgent):
 
         return OpenAIQueryResponse(response=response, message=message)
 
-    async def _execute_gpt5_tool_calls(
-        self, user_input, messages, output, exposed_entities, n_requests
-    ) -> OpenAIQueryResponse:
-        """Execute GPT-5 tool calls."""
-        try:
-            # Add the assistant's message with tool calls to history
-            messages.append({
-                "role": "assistant", 
-                "content": output.content if hasattr(output, 'content') else "",
-                "tool_calls": [tool_call.model_dump() for tool_call in output.tool_calls]
-            })
-            
-            # Execute each tool call
-            for tool_call in output.tool_calls:
-                function_name = tool_call.function.name if hasattr(tool_call, 'function') else tool_call.name
-                function = next(
-                    (s for s in self.get_functions() if s["spec"]["name"] == function_name),
-                    None,
-                )
-                
-                if function is not None:
-                    result = await self.execute_tool_function(
-                        user_input, tool_call, exposed_entities, function
-                    )
-                    
-                    messages.append({
-                        "tool_call_id": tool_call.id if hasattr(tool_call, 'id') else str(hash(function_name)),
-                        "role": "tool",
-                        "name": function_name,
-                        "content": str(result),
-                    })
-                else:
-                    _LOGGER.error("Function not found: %s", function_name)
-                    messages.append({
-                        "tool_call_id": tool_call.id if hasattr(tool_call, 'id') else str(hash(function_name)),
-                        "role": "tool", 
-                        "name": function_name,
-                        "content": f"Error: Function {function_name} not found",
-                    })
-            
-            # Continue conversation with updated messages
-            return await self.query(user_input, messages, exposed_entities, n_requests)
-            
-        except Exception as e:
-            _LOGGER.error("Error executing GPT-5 tool calls: %s", e)
-            # Return a basic response
-            message = ChatCompletionMessage(
-                role="assistant",
-                content=f"I encountered an error while processing your request: {e}"
-            )
-            mock_response = type('MockResponse', (), {
-                'usage': type('Usage', (), {'total_tokens': 0})(),
-                'choices': [type('Choice', (), {'message': message})()]
-            })()
-            return OpenAIQueryResponse(response=mock_response, message=message)
 
     async def execute_function_call(
         self,
