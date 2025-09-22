@@ -58,6 +58,8 @@ from .const import (
     CONF_USE_CREATE_EVENT_TOOL,
     CONF_USE_GET_EVENTS_TOOL,
     CONF_USE_GET_ATTRIBUTES_TOOL,
+    CONF_USE_GET_AUTOMATION_TOOL,
+    CONF_USE_ADJUST_AUTOMATION_TOOL,
     CONF_ENABLE_CONTINUOUS_CONVERSATION,
     DEFAULT_ATTACH_USERNAME,
     DEFAULT_CHAT_MODEL,
@@ -78,6 +80,8 @@ from .const import (
     DEFAULT_USE_CREATE_EVENT_TOOL,
     DEFAULT_USE_GET_EVENTS_TOOL,
     DEFAULT_USE_GET_ATTRIBUTES_TOOL,
+    DEFAULT_USE_GET_AUTOMATION_TOOL,
+    DEFAULT_USE_ADJUST_AUTOMATION_TOOL,
     DEFAULT_ENABLE_CONTINUOUS_CONVERSATION,
     DOMAIN,
     EVENT_CONVERSATION_FINISHED,
@@ -342,15 +346,23 @@ class OpenAIAgent(conversation.AbstractConversationAgent):
             },
             CONF_USE_CREATE_EVENT_TOOL: {
                 "schema": GPT5_FUNCTION_SCHEMAS["create_event"],
-                "executor": {"type": "script", "sequence": [{"service": "calendar.create_event"}]}
+                "executor": {"type": "native", "name": "create_calendar_event"}
             },
             CONF_USE_GET_EVENTS_TOOL: {
                 "schema": GPT5_FUNCTION_SCHEMAS["get_events"],
-                "executor": {"type": "script", "sequence": [{"service": "calendar.get_events"}]}
+                "executor": {"type": "native", "name": "get_calendar_events"}
             },
             CONF_USE_GET_ATTRIBUTES_TOOL: {
                 "schema": GPT5_FUNCTION_SCHEMAS["get_attributes"],
                 "executor": {"type": "template", "value_template": "{{ states[entity_id] }}"}
+            },
+            CONF_USE_GET_AUTOMATION_TOOL: {
+                "schema": GPT5_FUNCTION_SCHEMAS["get_automation"],
+                "executor": {"type": "native", "name": "get_automation"}
+            },
+            CONF_USE_ADJUST_AUTOMATION_TOOL: {
+                "schema": GPT5_FUNCTION_SCHEMAS["adjust_automation"],
+                "executor": {"type": "native", "name": "adjust_automation"}
             }
         }
         
@@ -365,6 +377,8 @@ class OpenAIAgent(conversation.AbstractConversationAgent):
                 CONF_USE_CREATE_EVENT_TOOL: DEFAULT_USE_CREATE_EVENT_TOOL,
                 CONF_USE_GET_EVENTS_TOOL: DEFAULT_USE_GET_EVENTS_TOOL,
                 CONF_USE_GET_ATTRIBUTES_TOOL: DEFAULT_USE_GET_ATTRIBUTES_TOOL,
+                CONF_USE_GET_AUTOMATION_TOOL: DEFAULT_USE_GET_AUTOMATION_TOOL,
+                CONF_USE_ADJUST_AUTOMATION_TOOL: DEFAULT_USE_ADJUST_AUTOMATION_TOOL,
             }.get(tool_conf, False)
             
             if self.entry.options.get(tool_conf, default_value):

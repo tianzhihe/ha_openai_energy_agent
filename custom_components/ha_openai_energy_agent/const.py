@@ -54,7 +54,7 @@ Directly conduct function calls to activate tools, no need to ask users for conf
 CONF_CHAT_MODEL = "chat_model"
 DEFAULT_CHAT_MODEL = "gpt-5"
 CONF_MAX_TOKENS = "max_tokens"
-DEFAULT_MAX_TOKENS = 150
+DEFAULT_MAX_TOKENS = 3000
 CONF_TOP_P = "top_p"
 DEFAULT_TOP_P = 1
 CONF_TEMPERATURE = "temperature"
@@ -69,6 +69,8 @@ CONF_USE_ADD_AUTOMATION_TOOL = "use_add_automation_tool"
 CONF_USE_CREATE_EVENT_TOOL = "use_create_event_tool"
 CONF_USE_GET_EVENTS_TOOL = "use_get_events_tool"
 CONF_USE_GET_ATTRIBUTES_TOOL = "use_get_attributes_tool"
+CONF_USE_GET_AUTOMATION_TOOL = "use_get_automation_tool"
+CONF_USE_ADJUST_AUTOMATION_TOOL = "use_adjust_automation_tool"
 
 # Default tool enablement - All tools enabled by default
 DEFAULT_USE_EXECUTE_SERVICES_TOOL = True
@@ -78,6 +80,8 @@ DEFAULT_USE_ADD_AUTOMATION_TOOL = True
 DEFAULT_USE_CREATE_EVENT_TOOL = True
 DEFAULT_USE_GET_EVENTS_TOOL = True
 DEFAULT_USE_GET_ATTRIBUTES_TOOL = True
+DEFAULT_USE_GET_AUTOMATION_TOOL = True
+DEFAULT_USE_ADJUST_AUTOMATION_TOOL = True
 
 # Continuous Conversation Configuration
 CONF_ENABLE_CONTINUOUS_CONVERSATION = "enable_continuous_conversation"
@@ -206,21 +210,17 @@ GPT5_FUNCTION_SCHEMAS = {
                 },
                 "start_date_time": {
                     "type": "string",
-                    "description": "Event start date and time"
+                    "description": "Event start date and time in ISO format (YYYY-MM-DDTHH:MM:SS)"
                 },
                 "end_date_time": {
                     "type": "string",
-                    "description": "Event end date and time"
-                },
-                "location": {
-                    "type": "string",
-                    "description": "Event location"
+                    "description": "Event end date and time in ISO format (YYYY-MM-DDTHH:MM:SS)"
                 }
             },
-            "required": ["summary"],
+            "required": ["summary", "start_date_time", "end_date_time"],
             "additionalProperties": False
         },
-        "strict": False
+        "strict": True
     },
     "get_events": {
         "type": "function",
@@ -256,6 +256,48 @@ GPT5_FUNCTION_SCHEMAS = {
                 }
             },
             "required": ["entity_id"],
+            "additionalProperties": False
+        },
+        "strict": True
+    },
+    "get_automation": {
+        "type": "function",
+        "name": "get_automation",
+        "description": "Retrieve existing Home Assistant automations and their configurations",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "automation_id": {
+                    "type": "string",
+                    "description": "Optional specific automation entity ID to retrieve (e.g., 'automation.energy_saver'). If not provided, returns all automations."
+                }
+            },
+            "additionalProperties": False
+        },
+        "strict": False
+    },
+    "adjust_automation": {
+        "type": "function",
+        "name": "adjust_automation",
+        "description": "Modify, enable, disable, or delete existing Home Assistant automations",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "automation_id": {
+                    "type": "string",
+                    "description": "The automation entity ID to modify (e.g., 'automation.energy_saver')"
+                },
+                "action": {
+                    "type": "string",
+                    "description": "Action to perform on the automation",
+                    "enum": ["enable", "disable", "delete", "update"]
+                },
+                "new_config": {
+                    "type": "string",
+                    "description": "New automation configuration in YAML format (required for 'update' action)"
+                }
+            },
+            "required": ["automation_id", "action"],
             "additionalProperties": False
         },
         "strict": True
