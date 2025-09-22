@@ -18,7 +18,7 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/tianzhihe/ha_openai_energy_agent/issues",
   "requirements": [
-    "openai>=1.40.0"
+    "openai==1.54.4"
   ],
   "version": "1.0.0"
 }
